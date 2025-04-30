@@ -82,22 +82,14 @@ export async function getUsers(req,res){
 
 //update
 
-export async function updateUser(req, res) {
+export async function updateUser(req,res){
     try {
         const email = req.params.email;
         const data = req.body;
-        const token = req.headers.authorization?.split(' ')[1];
 
-        if (!token) {
-            return res.status(401).json({ message: "Authentication required" });
-        }
-
-        // Verify the token and get the user
-        const decoded = JsonWebToken.verify(token, process.env.JWT_SECRET);
-        
-        // Allow update if the user is updating their own profile or is an admin
-        if (decoded.email === email || decoded.role === "admin") {
-            const result = await User.updateOne({ email: email }, data);
+        // Check if user is admin or updating their own profile
+        if(isItAdmin(req) || (req.user && req.user.email === email)) {
+            const result = await User.updateOne({email: email}, data);
             
             if (result.matchedCount === 0) {
                 return res.status(404).json({
@@ -110,14 +102,11 @@ export async function updateUser(req, res) {
             });
         } else {
             return res.status(403).json({
-                message: "You are not authorized to update this profile"
+                message: "You are not authorized to perform this action"
             });
         }
     } catch (error) {
-        console.error(error);
-        if (error.name === 'JsonWebTokenError') {
-            return res.status(401).json({ message: "Invalid token" });
-        }
+        console.error("Error updating user:", error);
         return res.status(500).json({
             message: "Failed to update user"
         });
@@ -148,15 +137,21 @@ export async function deleteUser(req, res) {
     }
 }
 
-
-
-
-
-
-
-
-
-
+export async function getUserByEmail(req, res) {
+    try {
+        const email = req.params.email;
+        const user = await User.findOne({ email: email });
+        
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        
+        res.json(user);
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: "Failed to get user" });
+    }
+}
 
 export function isItAdmin(req){
 
@@ -174,21 +169,4 @@ export function isItCustomer(req){
         isCustomer = true;
     }
     return isCustomer;
-}
-
-// Get user by email
-export async function getUserByEmail(req, res) {
-    try {
-        const email = req.params.email;
-        const user = await User.findOne({ email: email });
-        
-        if (!user) {
-            return res.status(404).json({ error: "User not found" });
-        }
-        
-        res.json(user);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Failed to get user" });
-    }
 }
